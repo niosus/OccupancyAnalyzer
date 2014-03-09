@@ -35,19 +35,28 @@ ParkingLots::ParkingLots(const qreal &leftCorner, const qreal &bottomCorner)
             // the rows are as follows:
             // 01___23___45___67___ ...
             // so we need to account for the gap
-            tempPoint.rx() = tempPoint.x() + (colNum / 2) * (_gap) * _metersInPx;
+            tempPoint.rx() = tempPoint.x() + (colNum / _gap_every) * (_gap) * _metersInPx;
             _centers.append(tempPoint);
             _occupancy.append(emptyCell);
+            _currentOccupancy.append(emptyCell);
         }
+    }
+}
+
+void ParkingLots::reInitCurrentOccupancy()
+{
+    _currentOccupancy.clear();
+    OccupancyCell emptyCell;
+    for (int i = 0; i < _occupancy.size(); ++i)
+    {
+        _currentOccupancy.append(emptyCell);
     }
 }
 
 void ParkingLots::updateClosest(const QPointF &detection)
 {
-    qDebug() <<qSetRealNumberPrecision(15)<< "searching close to "<<detection;
     qreal minDist = 1E+20; //should be big enough
     int minIndex = -1;
-    qDebug()<< "centers: "<<_centers.size();
     for (int i = 0; i < _centers.size(); ++i)
     {
         qreal currentDist = sqrt(QPointF::dotProduct(_centers[i] - detection, _centers[i] - detection));
@@ -55,7 +64,6 @@ void ParkingLots::updateClosest(const QPointF &detection)
         {
             minDist = currentDist;
             minIndex = i;
-            qDebug()<<qSetRealNumberPrecision(15)<<"dist to "<<_centers[i]<<" is"<<currentDist;
         }
     }
     if (minIndex < 0)
@@ -64,20 +72,24 @@ void ParkingLots::updateClosest(const QPointF &detection)
         return;
     }
     _occupancy[minIndex].occupied++;
+    _currentOccupancy[minIndex].occupied++;
     _tempUpdatedIndeces.append(minIndex);
     _realDetections.append(detection);
 }
 
-void ParkingLots::updateLeftFree()
+void ParkingLots::updateLeftFree(const QString& date)
 {
     for (int i = 0; i < _occupancy.size(); ++i)
     {
         if (!_tempUpdatedIndeces.contains(i))
         {
             _occupancy[i].free++;
+            _currentOccupancy[i].free++;
         }
     }
     _tempUpdatedIndeces.clear();
+    writeGraphFile(date, &_currentOccupancy);
+    reInitCurrentOccupancy();
 }
 
 void ParkingLots::update(const QVector<QPointF> &cars)
@@ -89,19 +101,26 @@ void ParkingLots::update(const QVector<QPointF> &cars)
 }
 
 
-void ParkingLots::writeGraphFile()
+void ParkingLots::writeGraphFile(const QString& type, const QVector<OccupancyCell> *occupancy) const
 {
-    QFile file("out.txt");
+    QFile file("/home/igor/Work/Thesis/MiscCode/OccupancyAnalyzer/grids/" + type + "_parkings_graph.dat");
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
         return;
-
+    if (occupancy == nullptr)
+    {
+        occupancy = &_occupancy;
+    }
     QTextStream out(&file);
     out.setRealNumberPrecision(10);
+    out << "rows: " << _numOfRows << "\t";
+    out << "cols: " << _numOfCols << "\t";
+    out << "gap_every: " << _gap_every << endl;
     for (int i = 0; i < _centers.size(); ++i)
     {
         out << "x: " << _centers[i].x() << " y: " << _centers[i].y();
-        out << " prob: " << _occupancy[i].getFreeProb() << endl;
+        out << " free_prob: " << occupancy->at(i).getFreeProb() << endl;
     }
+    qDebug() << "file written";
 }
 
 void ParkingLots::writeImage(
@@ -116,8 +135,6 @@ void ParkingLots::writeImage(
     int cellSize = 10; //px
     QImage image(width * cellSize, height * cellSize, QImage::Format_RGB32);
     qDebug() << xMin << xMax << yMin << yMax;
-    QColor colorGreen = QColor(0, 100, 0);
-    QColor colorRed = QColor(100, 0, 0);
     QColor colorGray = QColor(50, 50, 50);
 
     for (int i = 0; i < _occupancy.size(); ++i)
@@ -129,7 +146,6 @@ void ParkingLots::writeImage(
            for (int yy = currentCenterY - cellSize; yy < currentCenterY + cellSize; ++yy)
            {
                OccupancyCell cell = _occupancy[i];
-               qDebug()<<"free"<<cell.free<<"occ"<<cell.occupied;
                if (cell.free + cell.occupied < 1)
                {
                     image.setPixel(xx, image.height() - yy, colorGray.rgb());

@@ -1,6 +1,8 @@
 #ifndef OCCUPANCY_CELL_H
 #define OCCUPANCY_CELL_H
 
+#include <QDebug>
+
 class OccupancyCell {
 public:
     int occupied;
@@ -16,10 +18,16 @@ public:
         free = fr;
     }
 
-    qreal getFreeProb()
+    qreal getFreeProb() const
     {
         return ((qreal) free) / (free + occupied);
     }
 };
+
+inline QDebug& operator<< (QDebug& os, OccupancyCell& val)
+{
+    os<<"free ="<<val.free<<"\n"<<"occupied ="<<val.occupied;
+    return os;
+}
 
 #endif // OCCUPANCY_CELL_H

@@ -30,7 +30,7 @@ void DataGenerator::generateData()
                        tempHash[LogReader::CARS_POS]);
     }
     _parkingLots.writeImage(871851, 6077399, 872040, 6077539, "parking_lots");
-    _parkingLots.writeGraphFile();
+    _parkingLots.writeGraphFile("global");
 //    getCarsFromLogFiles();
 //    emit carsGenerated(_cars);
 //    emit gridsGenerated(_grids);
@@ -265,5 +265,5 @@ void DataGenerator::getCarPositionsFromAllDataLaser(
         name  = "mymap" + name;
 //        qDebug() << name;
     }
-    _parkingLots.updateLeftFree();
+    _parkingLots.updateLeftFree(date);
 }
